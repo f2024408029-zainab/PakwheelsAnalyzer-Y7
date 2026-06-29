@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-develop-scraper
 import re
 import sys
 import os
