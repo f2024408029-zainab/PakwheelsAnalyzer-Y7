@@ -1,3 +1,4 @@
+
 import os
 from sqlalchemy import create_engine, Column, Integer, String, func
 from sqlalchemy.orm import declarative_base, Session
@@ -64,7 +65,7 @@ def evaluate_car_deal(make, model, input_year, user_price):
         else:
             deal = "Fair Market Price"
 
-        # FIXED TYPO HERE (Sahi dictionary structure format)
+        # FIXED TYPO HERE 
         return {
             "status": "Success",
             "market_average": avg_price,
