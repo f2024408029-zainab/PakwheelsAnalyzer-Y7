@@ -1,72 +1,94 @@
 
-import csv
 import os
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, func
 from sqlalchemy.orm import declarative_base, Session
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "pakwheels.db")
-CSV_PATH = os.path.join(BASE_DIR, "sample_data.csv")
+# Database path setup
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "database", "pakwheels.db")
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 Base = declarative_base()
 
-
 class Car(Base):
-    """Database model for a PakWheels car listing."""
     __tablename__ = "cars"
 
-    id      = Column(Integer, primary_key=True, autoincrement=True)
-    title   = Column(String, nullable=False)
-    price   = Column(String, nullable=False)
-    year    = Column(String, nullable=False)
-    mileage = Column(String, nullable=False)
-    city    = Column(String, nullable=False)
-
-    def __repr__(self):
-        return f"<Car id={self.id} title={self.title!r} price={self.price!r}>"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    make = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    price = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False)
+    city = Column(String, nullable=False)
+    province = Column(String, nullable=False)
 
 def init_db():
-    """Create database tables if they don't exist."""
+    """Initializes the database and creates tables if they don't exist"""
     Base.metadata.create_all(engine)
-    print("[INFO] Database initialized successfully.")
 
+# --- ADVANCED MARKET ANALYTICS QUERIES ---
 
-def load_csv_to_db(csv_path=CSV_PATH):
-    """Read scraped CSV data and insert records into the database."""
-    if not os.path.exists(csv_path):
-        print(f"[ERROR] CSV file not found: {csv_path}")
-        return
-
+def query_filtered_cars(province=None, model=None, year=None):
+    """Fetches cars based on dynamic search filters"""
     with Session(engine) as session:
-       with open(csv_path, newline="", encoding="utf-8-sig") as csvfile:
-            reader = csv.DictReader(csvfile)
-            records = []
-            for row in reader:
-                car = Car(
-                    title   = row.get("title",   "N/A"),
-                    price   = row.get("price",   "N/A"),
-                    year    = row.get("year",    "N/A"),
-                    mileage = row.get("mileage", "N/A"),
-                    city    = row.get("city",    "N/A"),
-                )
-                records.append(car)
+        q = session.query(Car)
+        if province: q = q.filter(Car.province.ilike(province))
+        if model: q = q.filter(Car.model.ilike(model))
+        if year: q = q.filter(Car.year == int(year))
+        
+        return [
+            {"id": c.id, "title": c.title, "make": c.make, "model": c.model,
+             "price": c.price, "year": c.year, "city": c.city, "province": c.province}
+            for c in q.all()
+        ]
 
-            session.add_all(records)
-            session.commit()
-            print(f"[INFO] {len(records)} car records inserted into database.")
-
-
-def fetch_all_cars():
-    """Retrieve and display all car records from the database."""
+def evaluate_car_deal(make, model, input_year, user_price):
+    """Feature 1: Statistical Fair Market Deal Evaluator Engine"""
     with Session(engine) as session:
-        cars = session.query(Car).all()
-        print(f"\n[INFO] Total records in DB: {len(cars)}")
-        for car in cars[:5]:
-            print(f"  -> {car}")
-    return cars
+        avg_price = session.query(func.avg(Car.price)).filter(
+            Car.make.ilike(make),
+            Car.model.ilike(model),
+            Car.year == int(input_year)
+        ).scalar()
 
-if __name__ == "__main__":
-    init_db()
-    load_csv_to_db()
-    fetch_all_cars()
+        if not avg_price:
+            return {"status": "Unknown", "message": "Not enough historical market data to evaluate."}
+
+        avg_price = int(avg_price)
+        lower_threshold = avg_price * 0.90
+        upper_threshold = avg_price * 1.10
+
+        if user_price < lower_threshold:
+            deal = "Great Deal (Underpriced)"
+        elif user_price > upper_threshold:
+            deal = "Overpriced"
+        else:
+            deal = "Fair Market Price"
+
+        # FIXED TYPO HERE 
+        return {
+            "status": "Success",
+            "market_average": avg_price,
+            "your_price": user_price,
+            "deal_evaluation": deal
+        }
+
+def get_market_dashboard_stats():
+    """Feature 2: Dynamic Dashboard KPI Breakdown Metadata"""
+    with Session(engine) as session:
+        total_cars = session.query(func.count(Car.id)).scalar()
+        if total_cars == 0 or total_cars is None:
+            return {"error": "Database is empty"}
+
+        min_car = session.query(Car.title, Car.price).order_by(Car.price.asc()).first()
+        max_car = session.query(Car.title, Car.price).order_by(Car.price.desc()).first()
+
+        top_brands_raw = session.query(Car.make, func.count(Car.id)).group_by(Car.make).order_by(func.count(Car.id).desc()).limit(3).all()
+        top_brands = [{"brand": item[0], "listings": item[1]} for item in top_brands_raw]
+
+        return {
+            "total_listings": total_cars,
+            "cheapest_car": {"title": min_car[0], "price": min_car[1]} if min_car else None,
+            "most_expensive_car": {"title": max_car[0], "price": max_car[1]} if max_car else None,
+            "market_share": top_brands
+        }
