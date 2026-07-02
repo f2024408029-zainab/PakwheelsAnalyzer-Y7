@@ -12,15 +12,32 @@ async function loadDashboardStats() {
     } catch (e) { console.log("Stats fetch error", e); }
 }
 
+function setScraperStatus(message, type, icon) {
+    const el = document.getElementById('scraper-status');
+    el.className = `scraper-status ${type}`;
+    el.innerHTML = `<i class="bi ${icon}"></i> ${message}`;
+}
+
 async function triggerScraper() {
-    alert("Live background scraping process started. Please stand by...");
+    const btn = document.getElementById('scraper-btn');
+    btn.disabled = true;
+    setScraperStatus("Scraping live listings, please stand by...", "active", "bi-hourglass-split");
+
     try {
         let res = await fetch(`${API_BASE}/scrape`, { method: 'POST' });
         let data = await res.json();
-        alert(data.status || data.error);
+        if (data.error) {
+            setScraperStatus(data.error, "error", "bi-exclamation-triangle-fill");
+        } else {
+            setScraperStatus(data.status, "success", "bi-check-circle-fill");
+        }
         loadDashboardStats();
         fetchFilteredCars();
-    } catch (e) { alert("Failed to trigger scraper. Is the backend (port 5000) running?"); }
+    } catch (e) {
+        setScraperStatus("Failed to trigger scraper. Is the backend (port 5000) running?", "error", "bi-x-circle-fill");
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function fetchFilteredCars() {
@@ -40,9 +57,9 @@ async function fetchFilteredCars() {
                 html += `<tr>
                     <td class="fw-semibold">${car.title}</td>
                     <td>${car.city}</td>
-                    <td><span class="badge bg-secondary">${car.province}</span></td>
-                    <td>${car.year}</td>
-                    <td class="text-primary fw-bold">PKR ${(car.price / 100000).toFixed(2)} Lacs</td>
+                    <td><span class="badge-province">${car.province}</span></td>
+                    <td class="mono">${car.year}</td>
+                    <td class="mono text-warning fw-bold">PKR ${(car.price / 100000).toFixed(2)} Lacs</td>
                 </tr>`;
             });
         }
